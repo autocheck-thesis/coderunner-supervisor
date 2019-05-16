@@ -24,7 +24,34 @@ defmodule CoderunnerSupervisor do
         acc <> "\n" <> Enum.join(Map.get(x, "commands"), "\n")
       end)
 
-    {output, exit_code} = System.cmd("docker", ["run", "-i", image, "sh", "-c", commands])
-    IO.puts(output)
+    IO.puts(:stderr, "Creating image...")
+
+    {output, _} = System.cmd("docker", ["create", "-i", image, "sh", "-c", commands])
+
+    IO.puts(:stderr, "Running image...")
+
+    path = System.find_executable("docker")
+
+    Port.open({:spawn_executable, path}, [
+      :stderr_to_stdout,
+      :binary,
+      :exit_status,
+      args: ["start", "-i", String.trim(output)]
+    ])
+    |> stream_output()
+  end
+
+  defp stream_output(port) do
+    receive do
+      {^port, {:data, data}} ->
+        IO.write(data)
+        stream_output(port)
+
+      {^port, {:exit_status, 0}} ->
+        IO.puts(:stderr, "Command success")
+
+      {^port, {:exit_status, status}} ->
+        IO.puts(:stderr, "Command error, status #{status}")
+    end
   end
 end
