@@ -1,12 +1,15 @@
 defmodule CoderunnerSupervisor do
-  def start(test_data_url) do
+  def start(test_data_url, id) do
     HTTPoison.start()
 
     case HTTPoison.get(test_data_url) do
       {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
-        body
-        |> Jason.decode!()
-        |> run_tests()
+        test_suite = body |> Jason.decode!()
+
+        File.mkdir!("/tmp/coderunner/#{id}")
+        Enum.each(Map.fetch!(test_suite, "files"), &create_file(&1, id))
+
+        run_tests(test_suite, id)
 
       {:ok, %HTTPoison.Response{status_code: status_code}} ->
         # {:error, status_code}
@@ -18,7 +21,13 @@ defmodule CoderunnerSupervisor do
     end
   end
 
-  defp run_tests(%{"image" => image, "steps" => steps}) do
+  defp create_file(%{"name" => file_name, "contents" => contents}, id) do
+    IO.puts(:stderr, "Creating file #{file_name}...")
+    file_content = Base.decode64!(contents)
+    File.write!("/tmp/coderunner/#{id}/#{file_name}", file_content)
+  end
+
+  defp run_tests(%{"image" => image, "steps" => steps}, id) do
     commands =
       Enum.reduce(steps, "", fn x, acc ->
         acc <> "\n" <> Enum.join(Map.get(x, "commands"), "\n")
@@ -39,7 +48,19 @@ defmodule CoderunnerSupervisor do
     {output, code} =
       System.cmd(
         "docker",
-        ["run", "-a", "STDOUT", "-a", "STDERR", image, "sh", "-c", commands],
+        [
+          "run",
+          "-a",
+          "STDOUT",
+          "-a",
+          "STDERR",
+          "-v",
+          "/tmp/coderunner/#{id}:/tmp/files",
+          image,
+          "sh",
+          "-c",
+          commands
+        ],
         stderr_to_stdout: true
       )
 
