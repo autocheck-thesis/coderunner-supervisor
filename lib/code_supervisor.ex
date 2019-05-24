@@ -22,29 +22,37 @@ defmodule CoderunnerSupervisor do
   end
 
   defp create_file(%{"name" => file_name, "contents" => contents}, id) do
-    IO.puts(:stderr, "Creating file #{file_name}...")
+    print("Creating file #{file_name}...")
     file_content = Base.decode64!(contents)
     File.write!("/tmp/coderunner/#{id}/#{file_name}", file_content)
   end
 
   defp run_tests(%{"image" => image, "steps" => steps}, id) do
-    commands =
-      Enum.reduce(steps, "", fn x, acc ->
-        acc <> "\n" <> Enum.join(Map.get(x, "commands"), "\n")
-      end)
+    # commands =
+    #   Enum.reduce(steps, "", fn x, acc ->
+    #     acc <> "\n" <> Enum.join(Map.get(x, "commands"), "\n")
+    #   end)
 
-    IO.puts(:stderr, "Running image...")
+    print("Supervisor OK. Running job '#{id}'.")
+    print("Running #{length(steps)} steps...")
 
-    # port =
-    #   Port.open({:spawn_executable, System.find_executable("docker")}, [
-    #     :stderr_to_stdout,
-    #     # :binary,
-    #     :exit_status,
-    #     args: ["run", "-a", "STDOUT", "-a", "STDERR", image, "sh", "-c", commands]
-    #   ])
+    for step <- steps do
+      commands = Map.get(step, "commands", [])
+      name = Map.get(step, "name", "")
 
-    # stream_output(port)
+      print("Running step '#{name}'...")
 
+      for command <- commands do
+        case command do
+          ["command", [args]] -> run_command(image, id, args)
+          ["print", [string]] -> print(string)
+          [key, params] -> print("Invalid command '#{key}' with params '#{params}'")
+        end
+      end
+    end
+  end
+
+  defp run_command(image, id, command) do
     {output, code} =
       System.cmd(
         "docker",
@@ -59,11 +67,17 @@ defmodule CoderunnerSupervisor do
           image,
           "sh",
           "-c",
-          commands
+          command
         ],
         stderr_to_stdout: true
       )
 
     IO.binwrite(output)
+
+    if code != 0 do
+      print("Exit code: #{code}")
+    end
   end
+
+  defp print(string), do: IO.puts(:stderr, string)
 end
