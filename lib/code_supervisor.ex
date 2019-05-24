@@ -44,7 +44,7 @@ defmodule CoderunnerSupervisor do
 
       for command <- commands do
         case command do
-          ["command", [args]] -> run_command(image, id, args)
+          ["run", [cmd]] -> run(image, id, cmd)
           ["print", [string]] -> print(string)
           [key, params] -> print("Invalid command '#{key}' with params '#{params}'")
         end
@@ -52,7 +52,7 @@ defmodule CoderunnerSupervisor do
     end
   end
 
-  defp run_command(image, id, command) do
+  defp run(image, id, cmd) do
     {output, code} =
       System.cmd(
         "docker",
@@ -67,7 +67,7 @@ defmodule CoderunnerSupervisor do
           image,
           "sh",
           "-c",
-          command
+          cmd
         ],
         stderr_to_stdout: true
       )
