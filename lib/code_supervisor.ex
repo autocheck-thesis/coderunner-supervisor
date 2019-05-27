@@ -4,7 +4,7 @@ defmodule CoderunnerSupervisor do
 
     case HTTPoison.get(test_data_url) do
       {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
-        test_suite = body |> Jason.decode!() |> IO.inspect()
+        test_suite = body |> Jason.decode!()
 
         job_id = Map.fetch!(test_suite, "job_id")
 
