@@ -1,15 +1,17 @@
 defmodule CoderunnerSupervisor do
-  def start(test_data_url, id) do
+  def start(test_data_url) do
     HTTPoison.start()
 
     case HTTPoison.get(test_data_url) do
       {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
-        test_suite = body |> Jason.decode!()
+        test_suite = body |> Jason.decode!() |> IO.inspect()
 
-        File.mkdir!("/tmp/coderunner/#{id}")
-        Enum.each(Map.fetch!(test_suite, "files"), &create_file(&1, id))
+        job_id = Map.fetch!(test_suite, "job_id")
 
-        run_tests(test_suite, id)
+        File.mkdir!("/tmp/coderunner/#{job_id}")
+        Enum.each(Map.fetch!(test_suite, "files"), &create_file(&1, job_id))
+
+        run_tests(test_suite, job_id)
 
       {:ok, %HTTPoison.Response{status_code: status_code}} ->
         # {:error, status_code}
@@ -21,19 +23,19 @@ defmodule CoderunnerSupervisor do
     end
   end
 
-  defp create_file(%{"name" => file_name, "contents" => contents}, id) do
+  defp create_file(%{"name" => file_name, "contents" => contents}, job_id) do
     print("Creating file #{file_name}...")
     file_content = Base.decode64!(contents)
-    File.write!("/tmp/coderunner/#{id}/#{file_name}", file_content)
+    File.write!("/tmp/coderunner/#{job_id}/#{file_name}", file_content)
   end
 
-  defp run_tests(%{"image" => image, "steps" => steps}, id) do
+  defp run_tests(%{"image" => image, "steps" => steps}, job_id) do
     # commands =
     #   Enum.reduce(steps, "", fn x, acc ->
     #     acc <> "\n" <> Enum.join(Map.get(x, "commands"), "\n")
     #   end)
 
-    print("Supervisor OK. Running job '#{id}'.")
+    print("Supervisor OK. Running job '#{job_id}'.")
     print("Running #{length(steps)} steps...")
 
     for step <- steps do
@@ -44,7 +46,7 @@ defmodule CoderunnerSupervisor do
 
       for command <- commands do
         case command do
-          ["run", [cmd]] -> run(image, id, cmd)
+          ["run", [cmd]] -> run(image, job_id, cmd)
           ["print", [string]] -> print(string)
           [key, params] -> print("Invalid command '#{key}' with params '#{params}'")
         end
@@ -52,7 +54,7 @@ defmodule CoderunnerSupervisor do
     end
   end
 
-  defp run(image, id, cmd) do
+  defp run(image, job_id, cmd) do
     {output, code} =
       System.cmd(
         "docker",
@@ -63,7 +65,7 @@ defmodule CoderunnerSupervisor do
           "-a",
           "STDERR",
           "-v",
-          "/tmp/coderunner/#{id}:/tmp/files",
+          "/tmp/coderunner/#{job_id}:/tmp/files",
           image,
           "sh",
           "-c",
