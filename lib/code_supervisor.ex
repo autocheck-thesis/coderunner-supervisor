@@ -23,10 +23,25 @@ defmodule CoderunnerSupervisor do
     end
   end
 
-  defp create_file(%{"name" => file_name, "contents" => contents}, job_id) do
-    print("Creating file #{file_name}...")
-    file_content = Base.decode64!(contents)
-    File.write!("/tmp/coderunner/#{job_id}/#{file_name}", file_content)
+  defp create_file(%{"name" => filename, "contents" => contents}, job_id) do
+    case sanitize_path(filename, "/tmp/coderunner/#{job_id}") do
+      {:ok, path} ->
+        print("Creating file #{file_name}...")
+        File.mkdir_p!(Path.dirname(file_name))
+        File.write!("/tmp/coderunner/#{job_id}/#{file_name}", Base.decode64!(contents))
+
+      :error ->
+        print("Invalid filename: '#{filename}'")
+    end
+  end
+
+  defp sanitize_path(path, rootdir) do
+    expanded_path = Path.expand(path, rootdir)
+
+    case String.starts_with?(expanded_path, Path.expand(rootdir)) do
+      true -> {:ok, expanded_path}
+      false -> :error
+    end
   end
 
   defp run_tests(%{"image" => image, "steps" => steps}, job_id) do
@@ -35,7 +50,7 @@ defmodule CoderunnerSupervisor do
     #     acc <> "\n" <> Enum.join(Map.get(x, "commands"), "\n")
     #   end)
 
-    print("Supervisor OK. Running job '#{job_id}'.")
+    print("Supervisor OK. Running job '#{job_id}' within '#{image}'")
     print("Running #{length(steps)} steps...")
 
     for step <- steps do
@@ -60,12 +75,15 @@ defmodule CoderunnerSupervisor do
         "docker",
         [
           "run",
+          "--rm",
           "-a",
           "STDOUT",
           "-a",
           "STDERR",
           "-v",
           "/tmp/coderunner/#{job_id}:/tmp/files",
+          "-w",
+          "/tmp/files",
           image,
           "sh",
           "-c",
