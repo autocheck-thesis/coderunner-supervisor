@@ -26,16 +26,35 @@ defmodule CoderunnerSupervisor do
   defp create_file(%{"name" => filename, "contents" => contents}, job_id) do
     case sanitize_path(filename, "/tmp/coderunner/#{job_id}") do
       {:ok, path} ->
-        print("Creating file #{file_name}...")
-        File.mkdir_p!(Path.dirname(file_name))
-        File.write!("/tmp/coderunner/#{job_id}/#{file_name}", Base.decode64!(contents))
+        print("Creating path '#{path}'.")
+        File.mkdir_p!(Path.dirname(path))
+        File.write!(path, Base.decode64!(contents))
 
       :error ->
         print("Invalid filename: '#{filename}'")
     end
   end
 
-  defp sanitize_path(path, rootdir) do
+  @doc """
+
+  Sanitize file path. Used to protect against malicious traversals, etc...
+
+  ## Examples
+
+    iex> CoderunnerSupervisor.sanitize_path("bar.txt", "/tmp/coderunner/foo")
+    {:ok, "/tmp/coderunner/foo/bar.txt"}
+
+    iex> CoderunnerSupervisor.sanitize_path("../bar.txt", "/tmp/coderunner/foo")
+    :error
+
+    iex> CoderunnerSupervisor.sanitize_path("relative_path/../bar.txt", "/tmp/coderunner/foo")
+    {:ok, "/tmp/coderunner/foo/bar.txt"}
+
+    iex> CoderunnerSupervisor.sanitize_path("../../../bar.txt", "/tmp/coderunner/foo")
+    :error
+
+  """
+  def sanitize_path(path, rootdir) do
     expanded_path = Path.expand(path, rootdir)
 
     case String.starts_with?(expanded_path, Path.expand(rootdir)) do
@@ -92,7 +111,7 @@ defmodule CoderunnerSupervisor do
         stderr_to_stdout: true
       )
 
-    IO.binwrite(output)
+    IO.write(output)
 
     if code != 0 do
       print("Exit code: #{code}")
