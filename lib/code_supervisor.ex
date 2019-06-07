@@ -2,6 +2,9 @@ defmodule CoderunnerSupervisor do
   @host_path "/tmp/coderunner"
   @container_path "/tmp/coderunner"
 
+  # defined in seconds
+  @container_sleep_duration 10 * 60
+
   def start(test_data_url) do
     HTTPoison.start()
 
@@ -92,7 +95,7 @@ defmodule CoderunnerSupervisor do
           image,
           "/bin/sh",
           "-c",
-          "sleep 3600"
+          "sleep #{@container_sleep_duration}"
         ],
         stderr_to_stdout: true
       )
