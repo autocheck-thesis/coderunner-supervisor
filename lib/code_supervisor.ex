@@ -5,7 +5,7 @@ defmodule CoderunnerSupervisor do
   # defined in seconds
   @container_sleep_duration 10 * 60
 
-  def start(test_data_url, callback_url) do
+  def start(test_data_url, callback_url, worker_pid) do
     HTTPoison.start()
 
     case HTTPoison.get(test_data_url) do
@@ -14,7 +14,7 @@ defmodule CoderunnerSupervisor do
 
         job_id = Map.fetch!(test_suite, "job_id")
         create_files(test_suite, job_id)
-        run_tests(test_suite, job_id, callback_url)
+        run_tests(test_suite, job_id, callback_url, worker_pid)
 
       {:ok, %HTTPoison.Response{status_code: status_code}} ->
         # {:error, status_code}
@@ -26,8 +26,8 @@ defmodule CoderunnerSupervisor do
     end
   end
 
-  def send_result(result, callback_url) do
-    HTTPoison.post(callback_url, Jason.encode!(%{result: result}), [
+  def send_result(result, callback_url, worker_pid) do
+    HTTPoison.post(callback_url, Jason.encode!(%{result: result, worker_pid: worker_pid}), [
       {"Content-type", "application/json"}
     ])
   end
@@ -120,7 +120,7 @@ defmodule CoderunnerSupervisor do
     )
   end
 
-  defp run_tests(%{"image" => image, "steps" => steps}, job_id, callback_url) do
+  defp run_tests(%{"image" => image, "steps" => steps}, job_id, callback_url, worker_pid) do
     # commands =
     #   Enum.reduce(steps, "", fn x, acc ->
     #     acc <> "\n" <> Enum.join(Map.get(x, "commands"), "\n")
@@ -143,7 +143,7 @@ defmodule CoderunnerSupervisor do
       print("No steps defined.")
     end
 
-    steps |> Enum.map(&run_step(container_id, &1)) |> send_result(callback_url)
+    steps |> Enum.map(&run_step(container_id, &1)) |> send_result(callback_url, worker_pid)
 
     print("Stopping container.")
     stop_container(container_id)
