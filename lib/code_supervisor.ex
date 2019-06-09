@@ -5,7 +5,7 @@ defmodule CoderunnerSupervisor do
   # defined in seconds
   @container_sleep_duration 10 * 60
 
-  def start(test_data_url) do
+  def start(test_data_url, callback_url, worker_pid) do
     HTTPoison.start()
 
     case HTTPoison.get(test_data_url) do
@@ -14,7 +14,7 @@ defmodule CoderunnerSupervisor do
 
         job_id = Map.fetch!(test_suite, "job_id")
         create_files(test_suite, job_id)
-        run_tests(test_suite, job_id)
+        run_tests(test_suite, job_id, callback_url, worker_pid)
 
       {:ok, %HTTPoison.Response{status_code: status_code}} ->
         # {:error, status_code}
@@ -24,6 +24,12 @@ defmodule CoderunnerSupervisor do
         # {:error, reason}
         IO.puts("Error: #{reason}")
     end
+  end
+
+  def send_result(result, callback_url, worker_pid) do
+    HTTPoison.post(callback_url, Jason.encode!(%{result: result, worker_pid: worker_pid}), [
+      {"Content-type", "application/json"}
+    ])
   end
 
   defp create_files(test_suite, job_id) do
@@ -114,7 +120,7 @@ defmodule CoderunnerSupervisor do
     )
   end
 
-  defp run_tests(%{"image" => image, "steps" => steps}, job_id) do
+  defp run_tests(%{"image" => image, "steps" => steps}, job_id, callback_url, worker_pid) do
     # commands =
     #   Enum.reduce(steps, "", fn x, acc ->
     #     acc <> "\n" <> Enum.join(Map.get(x, "commands"), "\n")
@@ -133,32 +139,38 @@ defmodule CoderunnerSupervisor do
 
     if step_count = length(steps) do
       print("Running #{step_count} steps.")
-
-      for step <- steps do
-        commands = Map.get(step, "commands", [])
-        name = Map.get(step, "name", "")
-
-        print("#{name}")
-
-        for command <- commands do
-          case command do
-            ["run", [cmd]] -> run(container_id, cmd)
-            ["print", [string]] -> print(string)
-            [key, params] -> print("Invalid command '#{key}' with params '#{params}'")
-          end
-        end
-      end
     else
       print("No steps defined.")
     end
 
-    print("Stopping container.")
+    steps |> Enum.map(&run_step(container_id, &1)) |> send_result(callback_url, worker_pid)
 
+    print("Stopping container.")
     stop_container(container_id)
   end
 
-  defp run(container_id, cmd) do
-    {_output, code} =
+  defp run_step(container_id, step) do
+    commands = Map.get(step, "commands", [])
+    name = Map.get(step, "name", "")
+
+    print("#{name}")
+
+    %{
+      name: name,
+      command_results: commands |> Enum.map(&run_command(container_id, &1))
+    }
+  end
+
+  defp run_command(container_id, [key, params] = command) do
+    %{
+      key: key,
+      params: params,
+      result: command(key, params, container_id)
+    }
+  end
+
+  defp command("run", [cmd], container_id) do
+    {_output, exit_code} =
       System.cmd(
         "docker",
         [
@@ -174,9 +186,23 @@ defmodule CoderunnerSupervisor do
         into: IO.stream(:stdio, :line)
       )
 
-    if code != 0 do
-      print("Exit code: #{code}")
+    case exit_code do
+      0 -> true
+      _ -> %{error: "Non-zero exit code: #{exit_code}"}
     end
+  end
+
+  defp command("print", [string], _container_id) do
+    print(string)
+
+    true
+  end
+
+  defp command(key, params, _container_id) do
+    msg = "Invalid command '#{key}' with params '#{params}'"
+    print(msg)
+
+    %{error: msg}
   end
 
   defp print(string), do: IO.puts(:stderr, string)
