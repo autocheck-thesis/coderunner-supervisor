@@ -109,11 +109,11 @@ defmodule CoderunnerSupervisor do
     String.trim(output)
   end
 
-  defp stop_container(container_id) do
+  defp kill_container(container_id) do
     System.cmd(
       "docker",
       [
-        "stop",
+        "kill",
         container_id
       ],
       stderr_to_stdout: true
@@ -143,17 +143,19 @@ defmodule CoderunnerSupervisor do
       print("No steps defined.")
     end
 
-    steps |> Enum.map(&run_step(container_id, &1)) |> send_result(callback_url, worker_pid)
+    results = steps |> Enum.map(&run_step(container_id, &1))
+    print("Sending results.")
+    send_result(results, callback_url, worker_pid)
 
     print("Stopping container.")
-    stop_container(container_id)
+    kill_container(container_id)
   end
 
   defp run_step(container_id, step) do
     commands = Map.get(step, "commands", [])
     name = Map.get(step, "name", "")
 
-    print("#{name}")
+    print("Step #{name}")
 
     %{
       name: name,
