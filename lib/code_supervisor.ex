@@ -33,13 +33,17 @@ defmodule CoderunnerSupervisor do
   end
 
   defp create_files(test_suite, job_id) do
-    for file <- Map.fetch!(test_suite, "files"), do: create_file(file, job_id)
+    for file <- Map.fetch!(test_suite, "submission_files"),
+        do: create_file(file, job_id)
+
+    for file <- Map.fetch!(test_suite, "assignment_files"),
+        do: create_file(file, job_id, "assignment")
   end
 
-  defp create_file(%{"name" => filename, "contents" => contents}, job_id) do
-    case sanitize_path(filename, Path.join(@host_path, job_id)) do
+  defp create_file(%{"name" => filename, "contents" => contents}, job_id, basepath \\ "") do
+    case sanitize_path(Path.join([basepath, filename]), Path.join(@host_path, job_id)) do
       {:ok, path} ->
-        print("Creating path '#{path}'.")
+        # print("Creating path '#{path}'.")
         File.mkdir_p!(Path.dirname(path))
         File.write!(path, Base.decode64!(contents))
 
