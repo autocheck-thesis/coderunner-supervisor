@@ -22,7 +22,8 @@ defmodule CoderunnerSupervisor.MixProject do
   defp deps do
     [
       {:httpoison, "~> 1.5.1"},
-      {:jason, "~> 1.1"}
+      {:jason, "~> 1.1"},
+      {:autocheck, path: "../server"}
     ]
   end
 end
