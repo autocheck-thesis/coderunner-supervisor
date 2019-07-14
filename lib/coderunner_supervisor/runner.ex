@@ -104,7 +104,7 @@ defmodule CoderunnerSupervisor.Runner do
     }
   end
 
-  defp command(:run, [cmd], container_id) do
+  defp command("run", [cmd], container_id) do
     {_output, exit_code} =
       System.cmd(
         "docker",
@@ -127,7 +127,7 @@ defmodule CoderunnerSupervisor.Runner do
     end
   end
 
-  defp command(:print, [string], _container_id) do
+  defp command("print", [string], _container_id) do
     print(string)
 
     true

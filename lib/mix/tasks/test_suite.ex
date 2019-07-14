@@ -23,6 +23,8 @@ defmodule Mix.Tasks.TestSuite do
   end
 
   def run(args) do
+    IO.inspect(args)
+
     IO.puts(:stderr, """
     Error: Must specify remote/local.
     Examples:

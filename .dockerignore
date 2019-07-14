@@ -1,1 +1,9 @@
-/deps
+_build/
+deps/
+.git/
+.gitignore
+Dockerfile
+Makefile
+README*
+test/
+priv/static/

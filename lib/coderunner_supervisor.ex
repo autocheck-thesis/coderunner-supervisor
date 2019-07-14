@@ -59,7 +59,7 @@ defmodule CoderunnerSupervisor do
 
   defp read_configuration(path) do
     case File.read(path) do
-      {:ok, code} -> {:ok, Configuration.parse_code(code)}
+      {:ok, code} -> {:ok, AutocheckLanguage.parse!(code)}
       {:error, reason} -> {:error, "Could not read #{path} (#{inspect(reason)})"}
     end
   end
@@ -69,7 +69,7 @@ defmodule CoderunnerSupervisor do
 
     case HTTPoison.get(configuration_url) do
       {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
-        Jason.decode(body) |> map_keys_to_atoms()
+        Jason.decode(body, keys: :atoms)
 
       {:ok, %HTTPoison.Response{status_code: status_code}} ->
         {:error, status_code}
@@ -80,14 +80,14 @@ defmodule CoderunnerSupervisor do
   end
 
   defp create_files(configuration, path) do
-    for file <- Map.fetch!(configuration, "submission_files"),
+    for file <- configuration.submission_files,
         do: create_file(file, path)
 
-    for file <- Map.fetch!(configuration, "assignment_files"),
+    for file <- configuration.assignment_files,
         do: create_file(file, path, "assignment")
   end
 
-  defp create_file(%{"name" => filename, "contents" => contents} = _file, path, basepath \\ "") do
+  defp create_file(%{name: filename, contents: contents} = _file, path, basepath \\ "") do
     case sanitize_path(Path.join([basepath, filename]), path) do
       {:ok, path} ->
         # print("Creating path '#{path}'.")
@@ -128,12 +128,4 @@ defmodule CoderunnerSupervisor do
   end
 
   def print(string), do: IO.puts(:stderr, string)
-
-  defp map_keys_to_atoms(map) do
-    for {key, val} <- map, into: %{}, do: {String.to_atom(key), val}
-  end
-
-  defp map_keys_to_strings(map) do
-    for {key, val} <- map, into: %{}, do: {Atom.to_string(key), val}
-  end
 end
