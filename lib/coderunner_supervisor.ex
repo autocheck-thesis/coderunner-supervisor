@@ -59,7 +59,7 @@ defmodule CoderunnerSupervisor do
 
   defp read_configuration(path) do
     case File.read(path) do
-      {:ok, code} -> {:ok, Configuration.parse_code(code)}
+      {:ok, code} -> {:ok, AutocheckLanguage.parse!(code)}
       {:error, reason} -> {:error, "Could not read #{path} (#{inspect(reason)})"}
     end
   end

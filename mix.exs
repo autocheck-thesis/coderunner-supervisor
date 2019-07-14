@@ -23,7 +23,8 @@ defmodule CoderunnerSupervisor.MixProject do
     [
       {:httpoison, "~> 1.5.1"},
       {:jason, "~> 1.1"},
-      {:autocheck, path: "../server"}
+      {:autocheck_language, path: "../language"},
+      {:distillery, "~> 2.1"}
     ]
   end
 end
