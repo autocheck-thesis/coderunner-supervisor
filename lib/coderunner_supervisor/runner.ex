@@ -33,10 +33,14 @@ defmodule CoderunnerSupervisor.Runner do
           "-c",
           "sleep #{@container_sleep_duration}"
         ],
-        stderr_to_stdout: true
+        stderr_to_stdout: true,
+        into: []
       )
 
-    String.trim(output)
+    output
+    |> Enum.take(-1)
+    |> hd()
+    |> String.trim()
   end
 
   defp kill_container(container_id) do
@@ -60,7 +64,7 @@ defmodule CoderunnerSupervisor.Runner do
     #     acc <> "\n" <> Enum.join(Map.get(x, "commands"), "\n")
     #   end)
 
-    print("Creating container.")
+    print("Creating container. This can take a while.")
     container_id = create_container(job_id, image)
 
     print("Copying files into container.")
