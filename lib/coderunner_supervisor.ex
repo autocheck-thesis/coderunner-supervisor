@@ -16,14 +16,18 @@ defmodule CoderunnerSupervisor do
   end
 
   def start_local(configuration_path, files_path) do
-    with {:ok, configuration} <- read_configuration(configuration_path) do
-      configuration = Map.put(configuration, :job_id, Path.basename(files_path))
+    try do
+      with {:ok, configuration} <- read_configuration(configuration_path) do
+        configuration = Map.put(configuration, :job_id, Path.basename(files_path))
 
-      Runner.start(configuration, files_path, fn result ->
-        print_result(result)
-      end)
-    else
-      {:error, reason} -> IO.puts(:stderr, "Error: #{reason}")
+        Runner.start(configuration, files_path, fn result ->
+          print_result(result)
+        end)
+      else
+        {:error, reason} -> IO.puts(:stderr, "Error: #{reason}")
+      end
+    rescue
+      error in RuntimeError -> IO.puts(:stderr, "Configuration error: #{error.message}")
     end
   end
 
