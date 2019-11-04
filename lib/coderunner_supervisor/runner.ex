@@ -18,7 +18,7 @@ defmodule CoderunnerSupervisor.Runner do
     )
   end
 
-  defp create_container(job_id, image) do
+  defp create_container(job_id, image, network_access) do
     {output, _code} =
       System.cmd(
         "docker",
@@ -26,6 +26,8 @@ defmodule CoderunnerSupervisor.Runner do
           "run",
           "--rm",
           "-d",
+          "--network",
+          if(network_access, do: "bridge", else: "none"),
           "-w",
           Path.join(@container_path, job_id),
           image,
@@ -38,7 +40,7 @@ defmodule CoderunnerSupervisor.Runner do
       )
 
     output
-    |> Enum.take(-1)
+    |> Enum.reverse()
     |> hd()
     |> String.trim()
   end
@@ -55,7 +57,12 @@ defmodule CoderunnerSupervisor.Runner do
   end
 
   def start(
-        %{image: image, steps: steps, job_id: job_id} = configuration,
+        %{
+          image: image,
+          steps: steps,
+          job_id: job_id,
+          network_access: network_access
+        } = configuration,
         files_path,
         result_callback
       ) do
@@ -65,7 +72,7 @@ defmodule CoderunnerSupervisor.Runner do
     #   end)
 
     print("Creating container. This can take a while.")
-    container_id = create_container(job_id, image)
+    container_id = create_container(job_id, image, network_access)
 
     print("Copying files into container.")
     copy_files(container_id, files_path, @container_path)
