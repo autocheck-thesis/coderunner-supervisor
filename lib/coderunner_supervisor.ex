@@ -2,13 +2,13 @@ defmodule CoderunnerSupervisor do
   alias CoderunnerSupervisor.Runner
   alias Autocheck.Configuration
 
-  def start_remote(configuration_url, callback_url, worker_pid) do
+  def start_remote(configuration_url, callback_url) do
     with {:ok, configuration} <- fetch_remote_configuration(configuration_url) do
       files_path = Path.join("/tmp/coderunner", configuration.job_id)
       create_files(configuration, files_path)
 
       Runner.start(configuration, files_path, fn result ->
-        send_result(result, callback_url, worker_pid)
+        send_result(result, callback_url)
       end)
     else
       {:error, reason} -> IO.puts(:stderr, "Error: #{reason}")
@@ -31,8 +31,8 @@ defmodule CoderunnerSupervisor do
     end
   end
 
-  def send_result(result, callback_url, worker_pid) do
-    HTTPoison.post(callback_url, Jason.encode!(%{result: result, worker_pid: worker_pid}), [
+  def send_result(result, callback_url) do
+    HTTPoison.post(callback_url, Jason.encode!(%{result: result}), [
       {"Content-type", "application/json"}
     ])
   end

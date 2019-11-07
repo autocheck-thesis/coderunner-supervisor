@@ -4,8 +4,8 @@ defmodule Mix.Tasks.TestSuite do
   @configuration_file_name "Autocheckfile"
 
   @shortdoc "Run Autocheck test suite"
-  def run(["remote", test_suite_url, callback_url, worker_pid | _rest]) do
-    CoderunnerSupervisor.start_remote(test_suite_url, callback_url, worker_pid)
+  def run(["remote", test_suite_url, callback_url | _rest]) do
+    CoderunnerSupervisor.start_remote(test_suite_url, callback_url)
   end
 
   def run(["local", files_path | _rest]) do
